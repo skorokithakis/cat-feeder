@@ -30,6 +30,17 @@ void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
     } else if (payload == "close") {
         lidOpen = false;
         utils.debug("Got command to close lid.");
+    } else if (payload == "toggle") {
+        if (lidOpen) {
+            lidOpen = false;
+        } else {
+            lidOpen = true;
+        }
+        utils.debug("Got command to toggle the lid.");
+    } else if (payload == "reboot") {
+        utils.debug("Got a reboot command, rebooting...");
+        delay(500);
+        ESP.restart();
     }
 }
 
