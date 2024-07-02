@@ -1,0 +1,11 @@
+image: python:3.8
+
+stages:
+ - test
+
+before_script:
+  - "pip install -U platformio"
+
+job:
+  stage: test
+  script: "./build"

@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+import sys
+from pathlib import Path
+from shutil import copy
+from typing import Dict
+from typing import Union
+
+VERSION_FILENAME = ".version"
+
+
+def get_build_variables(filename: str) -> Dict[str, Union[int, str]]:
+    initial_vars: Dict[str, Union[int, str]] = {
+        "VERSION": get_version(),
+    }
+    try:
+        initial_vars.update(
+            dict(y.split("=", 1) for y in open(filename).read().split())  # type: ignore
+        )
+        initial_vars["VERSION"] = int(initial_vars["VERSION"])
+    except FileNotFoundError:
+        pass
+    except Exception:
+        print("Configuration file is malformed, please check the syntax.")
+
+    return initial_vars
+
+
+def build(
+    build_vars: Dict[str, Union[int, str]],
+    upload: bool = False,
+    port: str = None,
+    dirname: str = None,
+) -> None:
+
+    if dirname is None:
+        p = None
+    else:
+        p = Path(dirname).resolve()
+        if not p.is_dir():
+            raise ValueError("Given path must be a directory.")
+
+    print(f"Building {build_vars['PROJECT_NAME']} v{build_vars['VERSION']}...")
+
+    # Good luck.
+    build_flags = " ".join(
+        [f"""'-D{key}="{value}"'""" for key, value in build_vars.items()]
+    )
+    os.environ["PLATFORMIO_BUILD_FLAGS"] = build_flags
+
+    if upload and port:
+        r = subprocess.call(
+            f"platformio run --target upload --upload-port={port}", shell=True
+        )
+    elif upload:
+        r = subprocess.call("platformio run --target upload", shell=True)
+    else:
+        r = subprocess.call("platformio run", shell=True)
+
+    if r == 0:
+        print("Build completed successfully.")
+    else:
+        sys.exit("Build failed.")
+
+    if p:
+        p = p / f"{build_vars['PROJECT_NAME']}-{build_vars['VERSION']}.bin"
+        b = ".pio/build/esp12e/firmware.bin"
+        print(f"Copying {b} to {p}...")
+        copy(b, p)
+
+    print(
+        f"Built version {build_vars['VERSION']}, incrementing to {build_vars['VERSION']+1}..."
+    )
+    increment_version()
+
+
+def get_version() -> int:
+    p = Path(VERSION_FILENAME)
+
+    if not p.exists():
+        return 1
+
+    with p.open() as f:
+        return int(f.read().strip())
+
+
+def increment_version() -> None:
+    v = get_version()
+    v += 1
+    with open(VERSION_FILENAME, "w") as f:
+        f.write(str(v))
+
+
+def main():
+    build_vars = get_build_variables(".config")
+    build_vars.update(get_build_variables(".secrets"))
+
+    if len(sys.argv) == 1:
+        print("Building the project...")
+        build(build_vars)
+    elif sys.argv[1] == "usb":
+        print("Building the project and flashing to USB...")
+        build(build_vars, upload=True)
+    elif Path(sys.argv[1]).is_dir():
+        print(f"Building the project and copying to {Path(sys.argv[1]).resolve()}...")
+        build(build_vars, dirname=sys.argv[1])
+    else:
+        print(f"Building the project and uploading to {sys.argv[1]}...")
+        build(build_vars, upload=True, port=sys.argv[1])
+
+
+if __name__ == "__main__":
+    main()
