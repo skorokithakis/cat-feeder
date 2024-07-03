@@ -108,5 +108,5 @@ void loop() {
         delay(500);
         ESP.restart();
     }
-    delay(15);
+    delay(1);
 }
