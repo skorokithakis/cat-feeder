@@ -74,7 +74,6 @@ void connectMQTT() {
 }
 
 void setup() {
-    pinMode(LED_BUILTIN, OUTPUT);
     Serial.begin(115200);
     utils.connectToWiFi();
     utils.doHTTPUpdate();
@@ -97,7 +96,6 @@ void updateServo() {
             pos = outPos;
         }
     }
-    digitalWrite(LED_BUILTIN, lidOpen ? LOW : HIGH);
 }
 
 void loop() {
