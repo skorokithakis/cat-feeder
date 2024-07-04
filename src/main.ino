@@ -9,7 +9,7 @@ StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
 bool lidOpen = false;
-int pos = 1;  // Just so the lid closes on startup.
+int pos = 0;
 
 // Publish a message to MQTT if connected.
 void mqttPublish(String topic, String payload) {
@@ -79,6 +79,7 @@ void setup() {
     utils.doHTTPUpdate();
     connectMQTT();
     myservo.attach(2);
+    myservo.write(0);
 }
 
 void updateServo() {
