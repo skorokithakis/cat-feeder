@@ -11,7 +11,7 @@ WiFiClient wclient;
 PubSubClient client(wclient);
 bool lidOpen = false;
 unsigned int lastOpen = 0;
-int pos = 0;
+int pos = 1; // Just so the closing routine runs at startup.
 
 // Publish a message to MQTT if connected.
 void mqttPublish(String topic, String payload) {
@@ -82,8 +82,9 @@ void setup() {
     utils.connectToWiFi();
     utils.doHTTPUpdate();
     connectMQTT();
-    myservo.attach(2);
+    myservo.attach(5);
     myservo.write(0);
+    pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void updateServo() {
@@ -96,13 +97,14 @@ void updateServo() {
 
     if (newPos >= 0 && newPos <= 180) {
         if (lidOpen) {
-            newPos += 2;
+            newPos += 3;
         } else {
             newPos -= 1;
         }
         int outPos = constrain(newPos, 0, 180);
         if (outPos != pos) {
             myservo.write(outPos);
+            analogWrite(LED_BUILTIN, outPos == 0 ? HIGH : LOW);
             pos = outPos;
         }
     }
