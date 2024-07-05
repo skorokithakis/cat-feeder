@@ -96,7 +96,7 @@ void updateServo() {
 
     if (newPos >= 0 && newPos <= 180) {
         if (lidOpen) {
-            newPos += 1;
+            newPos += 2;
         } else {
             newPos -= 1;
         }
@@ -118,5 +118,5 @@ void loop() {
         delay(500);
         ESP.restart();
     }
-    delay(1);
+    delay(2);
 }
