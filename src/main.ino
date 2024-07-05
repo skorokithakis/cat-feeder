@@ -3,12 +3,14 @@
 #include <Servo.h>
 
 #define MQTT_PORT 1883
+#define OPEN_TIMEOUT 3 * 60
 
 Servo myservo;
 StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
 bool lidOpen = false;
+unsigned int lastOpen = 0;
 int pos = 0;
 
 // Publish a message to MQTT if connected.
@@ -26,6 +28,7 @@ void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
 
     if (payload == "open") {
         lidOpen = true;
+        lastOpen = millis() / 1000;
         utils.debug("Got command to open lid.");
     } else if (payload == "close") {
         lidOpen = false;
@@ -35,6 +38,7 @@ void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
             lidOpen = false;
         } else {
             lidOpen = true;
+            lastOpen = millis() / 1000;
         }
         utils.debug("Got command to toggle the lid.");
     } else if (payload == "reboot") {
@@ -84,6 +88,11 @@ void setup() {
 
 void updateServo() {
     int newPos = pos;
+
+    if (lidOpen && (((millis() / 1000) - lastOpen) > OPEN_TIMEOUT)) {
+        utils.debug("The lid has been open too long, closing...");
+        lidOpen = false;
+    }
 
     if (newPos >= 0 && newPos <= 180) {
         if (lidOpen) {
