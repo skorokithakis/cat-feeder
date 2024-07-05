@@ -82,9 +82,9 @@ void setup() {
     utils.connectToWiFi();
     utils.doHTTPUpdate();
     connectMQTT();
+    pinMode(LED_BUILTIN, OUTPUT);
     myservo.attach(5);
     myservo.write(0);
-    pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void updateServo() {
@@ -104,7 +104,7 @@ void updateServo() {
         int outPos = constrain(newPos, 0, 180);
         if (outPos != pos) {
             myservo.write(outPos);
-            analogWrite(LED_BUILTIN, outPos == 0 ? HIGH : LOW);
+            digitalWrite(LED_BUILTIN, outPos < 100 ? HIGH : LOW);
             pos = outPos;
         }
     }
