@@ -3,7 +3,7 @@
 #include <Servo.h>
 
 #define MQTT_PORT 1883
-#define OPEN_TIMEOUT 3 * 60
+#define OPEN_TIMEOUT 30 * 60
 
 Servo myservo;
 StavrosUtils utils;
