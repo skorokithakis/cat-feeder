@@ -5,6 +5,11 @@
 #define MQTT_PORT 1883
 #define OPEN_TIMEOUT 30 * 60
 
+#define TRIGGER_PIN 12
+#define ECHO_PIN 14
+
+#define SOUND_VELOCITY 0.034
+
 Servo myservo;
 StavrosUtils utils;
 WiFiClient wclient;
@@ -61,8 +66,9 @@ void connectMQTT() {
     client.setCallback(mqttCallback);
 
     int retries = 4;
-    utils.debug("Connecting to MQTT...");
-    while (!client.connect(PROJECT_NAME) && retries--) {
+    String mac = WiFi.macAddress();
+    utils.debug("Connecting to MQTT, MAC is " + mac + "...");
+    while (!client.connect(mac.c_str()) && retries--) {
         delay(500);
         utils.debug("Retry...");
     }
@@ -77,12 +83,32 @@ void connectMQTT() {
     client.subscribe("catfeeder/command");
 }
 
+int readDistance() {
+    long duration;
+    long distance;
+
+    digitalWrite(TRIGGER_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIGGER_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIGGER_PIN, LOW);
+
+    duration = pulseIn(ECHO_PIN, HIGH);
+    distance = duration * SOUND_VELOCITY / 2;
+
+    return distance;
+}
+
 void setup() {
     Serial.begin(115200);
     utils.connectToWiFi();
     utils.doHTTPUpdate();
     connectMQTT();
+
     pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(TRIGGER_PIN, OUTPUT);
+    pinMode(ECHO_PIN, INPUT);
+
     myservo.attach(5);
     myservo.write(0);
 }
@@ -111,6 +137,12 @@ void updateServo() {
 }
 
 void loop() {
+    int distance;
+    if (millis() % 300 == 0) {
+        distance = readDistance();
+        utils.debug(String("Distance: ") + String(distance));
+    }
+
     utils.connectToWiFi(5 * 60);
     connectMQTT();
     updateServo();
