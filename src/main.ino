@@ -8,6 +8,8 @@
 #define TRIGGER_PIN 12
 #define ECHO_PIN 14
 
+#define CLOSING_GRACE_PERIOD_SECS 15
+
 #define SOUND_VELOCITY 0.034
 
 Servo myservo;
@@ -15,6 +17,11 @@ StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
 bool lidOpen = false;
+
+// Whether the cat has come near the food after opening. This is so we can start the
+// countdown for closing.
+bool catThere = false;
+
 unsigned int lastOpen = 0;
 unsigned int lastNearby = 0;
 int pos = 1; // Just so the closing routine runs at startup.
@@ -154,11 +161,16 @@ void checkDistance() {
     utils.debug(String("Distance: ") + String(distance));
 
     if (distance < 30) {
+        if (!catThere) {
+            utils.debug("The cat is here, will start the countdown.");
+            catThere = true;
+        }
         lastNearby = millis() / 1000;
     }
 
-    if (((millis() / 1000) - lastNearby) > 30) {
+    if (catThere && ((millis() / 1000) - lastNearby) > CLOSING_GRACE_PERIOD_SECS) {
         lidOpen = false;
+        catThere = false;
     }
 }
 
