@@ -69,10 +69,6 @@ void connectMQTT() {
         return;
     }
 
-    client.setBufferSize(2 * 1024);
-    client.setServer(MQTT_SERVER, MQTT_PORT);
-    client.setCallback(mqttCallback);
-
     int retries = 4;
     String mac = WiFi.macAddress();
     utils.debug("Connecting to MQTT, MAC is " + mac + "...");
@@ -111,6 +107,11 @@ void setup() {
     Serial.begin(115200);
     utils.connectToWiFi();
     utils.doHTTPUpdate();
+
+    client.setBufferSize(2 * 1024);
+    client.setServer(MQTT_SERVER, MQTT_PORT);
+    client.setCallback(mqttCallback);
+
     connectMQTT();
 
     pinMode(LED_BUILTIN, OUTPUT);
