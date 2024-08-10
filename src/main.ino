@@ -16,6 +16,7 @@ WiFiClient wclient;
 PubSubClient client(wclient);
 bool lidOpen = false;
 unsigned int lastOpen = 0;
+unsigned int lastNearby = 0;
 int pos = 1; // Just so the closing routine runs at startup.
 
 // Publish a message to MQTT if connected.
@@ -136,16 +137,37 @@ void updateServo() {
     }
 }
 
-void loop() {
+void checkDistance() {
     int distance;
-    if (millis() % 300 == 0) {
-        distance = readDistance();
-        utils.debug(String("Distance: ") + String(distance));
+
+    if (!lidOpen) {
+        // Set lastNearby to now so the lid doesn't immediately close when we try to
+        // open it.
+        lastNearby = millis() / 1000;
+        return;
     }
 
+    if (millis() % 100 > 0) {
+        return;
+    }
+    distance = readDistance();
+    utils.debug(String("Distance: ") + String(distance));
+
+    if (distance < 30) {
+        lastNearby = millis() / 1000;
+    }
+
+    if (((millis() / 1000) - lastNearby) > 30) {
+        lidOpen = false;
+    }
+}
+
+void loop() {
     utils.connectToWiFi(5 * 60);
     connectMQTT();
     updateServo();
+
+    checkDistance();
 
     if (WiFi.status() != WL_CONNECTED) {
         utils.debug("Not connected to WiFi. Rebooting...");
