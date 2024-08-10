@@ -10,7 +10,7 @@
 
 #define CLOSING_GRACE_PERIOD_SECS 15
 
-#define SOUND_VELOCITY 0.034
+#define SOUND_VELOCITY 0.034 // Centimeters per microsecond.
 
 Servo myservo;
 StavrosUtils utils;
@@ -101,7 +101,7 @@ int readDistance() {
     delayMicroseconds(10);
     digitalWrite(TRIGGER_PIN, LOW);
 
-    duration = pulseIn(ECHO_PIN, HIGH);
+    duration = pulseIn(ECHO_PIN, HIGH, 10 * 1000);
     distance = duration * SOUND_VELOCITY / 2;
 
     return distance;
