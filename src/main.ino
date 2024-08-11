@@ -99,7 +99,7 @@ int readDistance() {
     delayMicroseconds(10);
     digitalWrite(TRIGGER_PIN, LOW);
 
-    duration = pulseIn(ECHO_PIN, HIGH, 10 * 1000);
+    duration = pulseIn(ECHO_PIN, HIGH, 20 * 1000);
     distance = duration * SOUND_VELOCITY / 2;
 
     return distance;
