@@ -9,7 +9,7 @@
 #define ECHO_PIN 14
 
 #define CLOSING_GRACE_PERIOD_SECS 15
-#define MAX_DISTANCE 50
+#define MAX_DISTANCE 40
 
 #define SOUND_VELOCITY 0.034 // Centimeters per microsecond.
 
