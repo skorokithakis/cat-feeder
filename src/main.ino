@@ -17,6 +17,7 @@ Servo myservo;
 StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
+unsigned int lastCheck;
 int closeDistances = 0;
 bool lidOpen = false;
 
@@ -36,24 +37,34 @@ void mqttPublish(String topic, String payload) {
     client.publish(topic.c_str(), payload.c_str());
 }
 
+void openLid() {
+    lidOpen = true;
+    lastOpen = millis() / 1000;
+
+    // Set lastCheck in the future so we don't start reading while the lid is opening.
+    lastCheck = millis() + 2000;
+}
+
+void closeLid() {
+    lidOpen = false;
+}
+
 // Receive a message from MQTT and act on it.
 void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
     chPayload[length] = '\0';
     String payload = String((char *)chPayload);
 
     if (payload == "open") {
-        lidOpen = true;
-        lastOpen = millis() / 1000;
+        openLid();
         utils.debug("Got command to open lid.");
     } else if (payload == "close") {
-        lidOpen = false;
+        closeLid();
         utils.debug("Got command to close lid.");
     } else if (payload == "toggle") {
         if (lidOpen) {
-            lidOpen = false;
+            closeLid();
         } else {
-            lidOpen = true;
-            lastOpen = millis() / 1000;
+            openLid();
         }
         utils.debug("Got command to toggle the lid.");
     } else if (payload == "reboot") {
@@ -148,8 +159,6 @@ void updateServo() {
 }
 
 void checkDistance() {
-    int distance;
-
     if (!lidOpen) {
         // Set lastNearby to now so the lid doesn't immediately close when we try to
         // open it.
@@ -157,10 +166,11 @@ void checkDistance() {
         return;
     }
 
-    if (millis() % 50 > 0) {
+    if (millis() < lastCheck + 100) {
         return;
     }
-    distance = readDistance();
+
+    int distance = readDistance();
     utils.debug(String("Distance: ") + String(distance));
 
     if (distance < MAX_DISTANCE) {
@@ -182,6 +192,7 @@ void checkDistance() {
         catThere = false;
         closeDistances = 0;
     }
+    lastCheck = millis();
 }
 
 void loop() {
@@ -196,5 +207,5 @@ void loop() {
         delay(500);
         ESP.restart();
     }
-    delay(2);
+    delay(10);
 }
