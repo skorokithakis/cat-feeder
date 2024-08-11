@@ -9,7 +9,7 @@
 #define ECHO_PIN 14
 
 #define CLOSING_GRACE_PERIOD_SECS 15
-#define MAX_DISTANCE 40
+#define MAX_DISTANCE 50
 
 #define SOUND_VELOCITY 0.034 // Centimeters per microsecond.
 
@@ -17,6 +17,7 @@ Servo myservo;
 StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
+int closeDistances = 0;
 bool lidOpen = false;
 
 // Whether the cat has come near the food after opening. This is so we can start the
@@ -156,23 +157,30 @@ void checkDistance() {
         return;
     }
 
-    if (millis() % 100 > 0) {
+    if (millis() % 50 > 0) {
         return;
     }
     distance = readDistance();
     utils.debug(String("Distance: ") + String(distance));
 
     if (distance < MAX_DISTANCE) {
+        closeDistances++;
+    }
+
+    // Sometimes we get spurious readings, so require multiple distances to be close.
+    if (closeDistances > 1) {
         if (!catThere) {
             utils.debug("The cat is here, will start the countdown.");
             catThere = true;
         }
         lastNearby = millis() / 1000;
+        closeDistances = 0;
     }
 
     if (catThere && ((millis() / 1000) - lastNearby) > CLOSING_GRACE_PERIOD_SECS) {
         lidOpen = false;
         catThere = false;
+        closeDistances = 0;
     }
 }
 
