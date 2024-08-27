@@ -1,19 +1,21 @@
 #include <StavrosUtils.h>
 #include "PubSubClient.h"
 #include <Servo.h>
+#include <VL53L0X.h>
+
+
+#define SERVO_PIN 5
 
 #define MQTT_PORT 1883
 #define OPEN_TIMEOUT 30 * 60
 
-#define TRIGGER_PIN 12
-#define ECHO_PIN 14
-
 #define CLOSING_GRACE_PERIOD_SECS 15
-#define MAX_DISTANCE 50
+#define MAX_DISTANCE 30
 
 #define SOUND_VELOCITY 0.034 // Centimeters per microsecond.
 
 Servo myservo;
+VL53L0X rangefinder;
 StavrosUtils utils;
 WiFiClient wclient;
 PubSubClient client(wclient);
@@ -100,39 +102,14 @@ void connectMQTT() {
     client.subscribe("catfeeder/command");
 }
 
-int readDistance() {
-    long duration;
-    long distance;
+long readDistance() {
+    long distance = rangefinder.readRangeSingleMillimeters();
 
-    digitalWrite(TRIGGER_PIN, LOW);
-    delayMicroseconds(2);
-    digitalWrite(TRIGGER_PIN, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(TRIGGER_PIN, LOW);
+    if (rangefinder.timeoutOccurred()) {
+        distance = 1000;
+    }
 
-    duration = pulseIn(ECHO_PIN, HIGH, 20 * 1000);
-    distance = duration * SOUND_VELOCITY / 2;
-
-    return distance;
-}
-
-void setup() {
-    Serial.begin(115200);
-    utils.connectToWiFi();
-    utils.doHTTPUpdate();
-
-    client.setBufferSize(2 * 1024);
-    client.setServer(MQTT_SERVER, MQTT_PORT);
-    client.setCallback(mqttCallback);
-
-    connectMQTT();
-
-    pinMode(LED_BUILTIN, OUTPUT);
-    pinMode(TRIGGER_PIN, OUTPUT);
-    pinMode(ECHO_PIN, INPUT);
-
-    myservo.attach(5);
-    myservo.write(0);
+    return distance / 10;
 }
 
 void updateServo() {
@@ -170,11 +147,13 @@ void checkDistance() {
         return;
     }
 
-    int distance = readDistance();
+    long distance = readDistance();
     utils.debug(String("Distance: ") + String(distance));
 
     if (distance < MAX_DISTANCE) {
         closeDistances++;
+    } else {
+        closeDistances = 0;
     }
 
     // Sometimes we get spurious readings, so require multiple distances to be close.
@@ -193,6 +172,52 @@ void checkDistance() {
         closeDistances = 0;
     }
     lastCheck = millis();
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    utils.connectToWiFi();
+    utils.doHTTPUpdate();
+
+    int count;
+
+    for (byte i = 8; i < 120; i++) {
+        Wire.beginTransmission(i);
+        if (Wire.endTransmission() == 0) {
+            Serial.print("Found address: ");
+            Serial.print(i, DEC);
+            Serial.print(" (0x");
+            Serial.print(i, HEX);
+            Serial.println(")");
+            count++;
+            delay(1);
+        }
+    }
+    Serial.println("Done searching for I2C.");
+
+    client.setBufferSize(2 * 1024);
+    client.setServer(MQTT_SERVER, MQTT_PORT);
+    client.setCallback(mqttCallback);
+
+    connectMQTT();
+
+    pinMode(LED_BUILTIN, OUTPUT);
+
+    myservo.attach(SERVO_PIN);
+    myservo.write(0);
+
+    Wire.begin(12, 14);  // SDA, SCL
+    rangefinder.setTimeout(500);
+    if (!rangefinder.init()) {
+        utils.debug("Failed to detect and initialize sensor!");
+        delay(1000);
+        ESP.restart();
+    }
+    rangefinder.setSignalRateLimit(0.1);
+    rangefinder.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+    rangefinder.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+    rangefinder.setMeasurementTimingBudget(50000);
 }
 
 void loop() {
