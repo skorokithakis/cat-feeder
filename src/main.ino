@@ -93,9 +93,16 @@ void connectMQTT() {
     }
 
     if (!client.connected()) {
-        utils.debug("\nfatal: MQTT server connection failed. Rebooting.");
-        delay(500);
-        ESP.restart();
+        if (lidOpen) {
+            utils.debug("\nfatal: MQTT server connection failed with the lid open, freezing to avoid problems.");
+            while (true) {
+                delay(500);
+            }
+        } else {
+            utils.debug("\nfatal: MQTT server connection failed. Rebooting.");
+            delay(500);
+            ESP.restart();
+        }
     }
 
     utils.debug("Connected to MQTT.");
