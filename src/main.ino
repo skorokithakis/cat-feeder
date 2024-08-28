@@ -217,7 +217,7 @@ void setup() {
     rangefinder.setSignalRateLimit(0.1);
     rangefinder.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
     rangefinder.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-    rangefinder.setMeasurementTimingBudget(50000);
+    rangefinder.setMeasurementTimingBudget(20 * 1000);
 }
 
 void loop() {
