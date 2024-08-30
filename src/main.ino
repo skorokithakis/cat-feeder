@@ -72,8 +72,8 @@ void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
         utils.debug("Got command to toggle the lid.");
     } else if (payload == "reboot") {
         utils.debug("Got a reboot command, rebooting...");
-        delay(500);
-        ESP.restart();
+        closeLid();
+        rebootAfterClose = true;
     }
 }
 
