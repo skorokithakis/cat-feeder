@@ -22,6 +22,7 @@ PubSubClient client(wclient);
 unsigned int lastCheck;
 int closeDistances = 0;
 bool lidOpen = false;
+bool rebootAfterClose = false;
 
 // Whether the cat has come near the food after opening. This is so we can start the
 // countdown for closing.
@@ -94,10 +95,9 @@ void connectMQTT() {
 
     if (!client.connected()) {
         if (lidOpen) {
-            utils.debug("\nfatal: MQTT server connection failed with the lid open, freezing to avoid problems.");
-            while (true) {
-                delay(500);
-            }
+            utils.debug("\nfatal: MQTT server connection failed with the lid open, closing lid to reboot.");
+            closeLid();
+            rebootAfterClose = true;
         } else {
             utils.debug("\nfatal: MQTT server connection failed. Rebooting.");
             delay(500);
@@ -139,6 +139,12 @@ void updateServo() {
             digitalWrite(LED_BUILTIN, outPos < 100 ? HIGH : LOW);
             pos = outPos;
         }
+    }
+
+    if (pos == 0 && rebootAfterClose) {
+        utils.debug("Lid closed, rebooting...");
+        delay(500);
+        ESP.restart();
     }
 }
 
