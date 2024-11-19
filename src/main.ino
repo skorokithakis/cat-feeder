@@ -7,7 +7,7 @@
 #define SERVO_PIN 5
 
 #define MQTT_PORT 1883
-#define OPEN_TIMEOUT 30 * 60
+#define OPEN_TIMEOUT 10 * 60
 
 #define CLOSING_GRACE_PERIOD_SECS 15
 #define MAX_DISTANCE 30
