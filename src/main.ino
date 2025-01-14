@@ -3,7 +3,6 @@
 #include <Servo.h>
 #include <VL53L0X.h>
 
-
 #define SERVO_PIN 5
 
 #define MQTT_PORT 1883
@@ -14,6 +13,12 @@
 
 #define SOUND_VELOCITY 0.034 // Centimeters per microsecond.
 
+enum LidState {
+    LID_CLOSED,
+    LID_OPEN,
+    LID_PERSISTENT_OPEN
+};
+
 Servo myservo;
 VL53L0X rangefinder;
 StavrosUtils utils;
@@ -21,7 +26,7 @@ WiFiClient wclient;
 PubSubClient client(wclient);
 unsigned int lastCheck;
 int closeDistances = 0;
-bool lidOpen = false;
+LidState lidState = LID_CLOSED;
 bool rebootAfterClose = false;
 
 // Whether the cat has come near the food after opening. This is so we can start the
@@ -40,8 +45,8 @@ void mqttPublish(String topic, String payload) {
     client.publish(topic.c_str(), payload.c_str());
 }
 
-void openLid() {
-    lidOpen = true;
+void openLid(bool persistent = false) {
+    lidState = persistent ? LID_PERSISTENT_OPEN : LID_OPEN;
     lastOpen = millis() / 1000;
 
     // Set lastCheck in the future so we don't start reading while the lid is opening.
@@ -49,7 +54,7 @@ void openLid() {
 }
 
 void closeLid() {
-    lidOpen = false;
+    lidState = LID_CLOSED;
 }
 
 // Receive a message from MQTT and act on it.
@@ -58,16 +63,19 @@ void mqttCallback(char *chTopic, byte *chPayload, unsigned int length) {
     String payload = String((char *)chPayload);
 
     if (payload == "open") {
-        openLid();
+        openLid(false);
         utils.debug("Got command to open lid.");
+    } else if (payload == "persistent_open") {
+        openLid(true);
+        utils.debug("Got command to open lid persistently.");
     } else if (payload == "close") {
         closeLid();
         utils.debug("Got command to close lid.");
     } else if (payload == "toggle") {
-        if (lidOpen) {
+        if (lidState != LID_CLOSED) {
             closeLid();
         } else {
-            openLid();
+            openLid(false);
         }
         utils.debug("Got command to toggle the lid.");
     } else if (payload == "reboot") {
@@ -94,7 +102,7 @@ void connectMQTT() {
     }
 
     if (!client.connected()) {
-        if (lidOpen) {
+        if (lidState != LID_CLOSED) {
             utils.debug("\nfatal: MQTT server connection failed with the lid open, closing lid to reboot.");
             closeLid();
             rebootAfterClose = true;
@@ -122,13 +130,13 @@ long readDistance() {
 void updateServo() {
     int newPos = pos;
 
-    if (lidOpen && (((millis() / 1000) - lastOpen) > OPEN_TIMEOUT)) {
+    if (lidState == LID_OPEN && (((millis() / 1000) - lastOpen) > OPEN_TIMEOUT)) {
         utils.debug("The lid has been open too long, closing...");
-        lidOpen = false;
+        lidState = LID_CLOSED;
     }
 
     if (newPos >= 0 && newPos <= 180) {
-        if (lidOpen) {
+        if (lidState != LID_CLOSED) {
             newPos += 3;
         } else {
             newPos -= 1;
@@ -149,7 +157,7 @@ void updateServo() {
 }
 
 void checkDistance() {
-    if (!lidOpen) {
+    if (lidState == LID_CLOSED || lidState == LID_PERSISTENT_OPEN) {
         // Set lastNearby to now so the lid doesn't immediately close when we try to
         // open it.
         lastNearby = millis() / 1000;
@@ -180,7 +188,7 @@ void checkDistance() {
     }
 
     if (catThere && ((millis() / 1000) - lastNearby) > CLOSING_GRACE_PERIOD_SECS) {
-        lidOpen = false;
+        lidState = LID_CLOSED;
         catThere = false;
         closeDistances = 0;
     }
@@ -220,7 +228,7 @@ void setup() {
     myservo.attach(SERVO_PIN);
     myservo.write(0);
 
-    Wire.begin(12, 14);  // SDA, SCL
+    Wire.begin(12, 14); // SDA, SCL
     rangefinder.setTimeout(500);
     if (!rangefinder.init()) {
         utils.debug("Failed to detect and initialize sensor!");
