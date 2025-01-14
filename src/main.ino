@@ -29,9 +29,9 @@ int closeDistances = 0;
 LidState lidState = LID_CLOSED;
 bool rebootAfterClose = false;
 
-// Whether the cat has come near the food after opening. This is so we can start the
-// countdown for closing.
-bool catThere = false;
+// Add near other global variables
+bool isCatNear = false;
+bool closeWhenCatLeaves = false;
 
 unsigned int lastOpen = 0;
 unsigned int lastNearby = 0;
@@ -46,6 +46,7 @@ void mqttPublish(String topic, String payload) {
 }
 
 void openLid(bool persistent = false) {
+    closeWhenCatLeaves = false; // Cancel any pending close
     lidState = persistent ? LID_PERSISTENT_OPEN : LID_OPEN;
     lastOpen = millis() / 1000;
 
@@ -54,7 +55,13 @@ void openLid(bool persistent = false) {
 }
 
 void closeLid() {
+    if (isCatNear) {
+        utils.debug("Cat is nearby; will close when cat leaves.");
+        closeWhenCatLeaves = true;
+        return;
+    }
     lidState = LID_CLOSED;
+    closeWhenCatLeaves = false;
 }
 
 // Receive a message from MQTT and act on it.
@@ -130,11 +137,6 @@ long readDistance() {
 void updateServo() {
     int newPos = pos;
 
-    if (lidState == LID_OPEN && (((millis() / 1000) - lastOpen) > OPEN_TIMEOUT)) {
-        utils.debug("The lid has been open too long, closing...");
-        lidState = LID_CLOSED;
-    }
-
     if (newPos >= 0 && newPos <= 180) {
         if (lidState != LID_CLOSED) {
             newPos += 3;
@@ -157,14 +159,12 @@ void updateServo() {
 }
 
 void checkDistance() {
-    if (lidState == LID_CLOSED || lidState == LID_PERSISTENT_OPEN) {
-        // Set lastNearby to now so the lid doesn't immediately close when we try to
-        // open it.
-        lastNearby = millis() / 1000;
+    if (millis() < lastCheck + 100) {
         return;
     }
 
-    if (millis() < lastCheck + 100) {
+    // Only check distance if lid is open
+    if (lidState == LID_CLOSED) {
         return;
     }
 
@@ -177,22 +177,36 @@ void checkDistance() {
         closeDistances = 0;
     }
 
-    // Sometimes we get spurious readings, so require multiple distances to be close.
-    if (closeDistances > 1) {
-        if (!catThere) {
-            utils.debug("The cat is here, will start the countdown.");
-            catThere = true;
-        }
+    // Sometimes we get spurious readings, so require multiple distances to be close
+    bool wasNear = isCatNear;
+    isCatNear = (closeDistances > 1);
+
+    if (isCatNear) {
         lastNearby = millis() / 1000;
-        closeDistances = 0;
+        if (!wasNear) {
+            utils.debug("Cat detected nearby.");
+        }
+    } else if (wasNear) {
+        utils.debug("Cat has left");
+        // Check if we were waiting to close
+        if (closeWhenCatLeaves) {
+            utils.debug("Executing delayed close command...");
+            closeWhenCatLeaves = false;
+            lidState = LID_CLOSED;
+        }
     }
 
-    if (catThere && ((millis() / 1000) - lastNearby) > CLOSING_GRACE_PERIOD_SECS) {
-        lidState = LID_CLOSED;
-        catThere = false;
-        closeDistances = 0;
-    }
     lastCheck = millis();
+}
+
+// Add new function to handle lid state changes
+void updateLidState() {
+    // Handle auto-closing for normal open state
+    if (lidState == LID_OPEN && !isCatNear &&
+            ((millis() / 1000) - lastOpen) > OPEN_TIMEOUT) {
+        utils.debug("Auto-closing lid after timeout...");
+        lidState = LID_CLOSED;
+    }
 }
 
 void setup() {
@@ -244,9 +258,10 @@ void setup() {
 void loop() {
     utils.connectToWiFi(5 * 60);
     connectMQTT();
-    updateServo();
 
-    checkDistance();
+    checkDistance();  // Just updates isCatNear
+    updateLidState(); // Handles automatic lid state changes
+    updateServo();    // Handles physical lid movement
 
     if (WiFi.status() != WL_CONNECTED) {
         utils.debug("Not connected to WiFi. Rebooting...");
