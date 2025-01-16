@@ -29,8 +29,8 @@ int closeDistances = 0;
 LidState lidState = LID_CLOSED;
 bool rebootAfterClose = false;
 
-// Add near other global variables
 bool isCatNear = false;
+bool catThere = false;
 bool closeWhenCatLeaves = false;
 
 unsigned int lastOpen = 0;
@@ -150,6 +150,7 @@ void updateServo() {
             pos = outPos;
         }
     }
+    delay(2);
 
     if (pos == 0 && rebootAfterClose) {
         utils.debug("Lid closed, rebooting...");
@@ -163,7 +164,7 @@ void checkDistance() {
         return;
     }
 
-    // Only check distance if lid is open
+    // Only check distance if lid is open.
     if (lidState == LID_CLOSED) {
         return;
     }
@@ -177,23 +178,29 @@ void checkDistance() {
         closeDistances = 0;
     }
 
-    // Sometimes we get spurious readings, so require multiple distances to be close
+    // Sometimes we get spurious readings, so require multiple distances to be close.
     bool wasNear = isCatNear;
-    isCatNear = (closeDistances > 1);
+    isCatNear = (closeDistances > 2);
 
     if (isCatNear) {
         lastNearby = millis() / 1000;
         if (!wasNear) {
             utils.debug("Cat detected nearby.");
+            catThere = true;
         }
     } else if (wasNear) {
-        utils.debug("Cat has left");
-        // Check if we were waiting to close
+        utils.debug("The cat has left.");
+        // Check if we were waiting to close.
         if (closeWhenCatLeaves) {
             utils.debug("Executing delayed close command...");
             closeWhenCatLeaves = false;
             lidState = LID_CLOSED;
         }
+    }
+
+    if (lidState == LID_OPEN && catThere && (((millis() / 1000) - lastNearby) > CLOSING_GRACE_PERIOD_SECS)) {
+        utils.debug("Closing the lid after the cat has left...");
+        closeLid();
     }
 
     lastCheck = millis();
