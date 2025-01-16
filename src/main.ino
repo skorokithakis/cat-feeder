@@ -62,6 +62,7 @@ void closeLid() {
     }
     lidState = LID_CLOSED;
     closeWhenCatLeaves = false;
+    catThere = false;
 }
 
 // Receive a message from MQTT and act on it.
@@ -193,8 +194,7 @@ void checkDistance() {
         // Check if we were waiting to close.
         if (closeWhenCatLeaves) {
             utils.debug("Executing delayed close command...");
-            closeWhenCatLeaves = false;
-            lidState = LID_CLOSED;
+            closeLid();
         }
     }
 
