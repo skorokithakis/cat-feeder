@@ -48,6 +48,11 @@ void mqttPublish(String topic, String payload) {
 void openLid(bool persistent = false) {
     closeWhenCatLeaves = false; // Cancel any pending close
     lidState = persistent ? LID_PERSISTENT_OPEN : LID_OPEN;
+    // Reset proximity state so stale readings don't trigger an immediate close.
+    catThere = false;
+    isCatNear = false;
+    closeDistances = 0;
+    lastNearby = millis() / 1000;
     lastOpen = millis() / 1000;
 
     // Set lastCheck in the future so we don't start reading while the lid is opening.
